@@ -37,6 +37,16 @@ class EvidenceGateTests(unittest.TestCase):
     def test_missing_url_at_budget_limit_is_not_completed(self):
         fake = FakeProvider([tool_call('1', 'get_incident_details', '{"provider":"github","incident_id":"xr3myzj7ms51"}'), final('Thiếu nguồn')])
         self.assertEqual(run_agent('x', fake, StatusTools(), max_steps=2)['status'], 'max_steps')
+    def test_linked_incident_must_be_followed(self):
+        fake = FakeProvider([tool_call('1', 'get_incident_details', '{"provider":"github","incident_id":"h02n9572mx9y"}'),
+                             final('Xem https://stspg.io/7pwv28hvkmz8'),
+                             tool_call('2', 'get_incident_details', '{"provider":"github","incident_id":"xr3myzj7ms51"}'),
+                             final('https://stspg.io/7pwv28hvkmz8 https://stspg.io/pjgptg3cfc6n')])
+        result = run_agent('x', fake, StatusTools(), max_steps=5)
+        self.assertEqual(result['status'], 'completed')
+        nudges = [x for x in result['trace'] if x['event'] == 'validation_unfollowed_link']
+        self.assertEqual(nudges[0]['incident_ids'], ['xr3myzj7ms51'])
+        self.assertIn('xr3myzj7ms51', fake.histories[2][-1]['content'])
     def test_failed_tool_does_not_require_source(self):
         fake = FakeProvider([tool_call('1', 'get_incident_details', '{"provider":"github","incident_id":"missing"}'), final('Không tìm được incident')])
         self.assertEqual(run_agent('x', fake, StatusTools())['status'], 'completed')
